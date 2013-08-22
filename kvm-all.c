@@ -2033,7 +2033,12 @@ int kvm_set_signal_mask(CPUState *cpu, const sigset_t *sigset)
 
     sigmask = g_malloc(sizeof(*sigmask) + sizeof(*sigset));
 
+#ifdef TARGET_MIPS
+    /* seems to be 16 for MIPS */
+    sigmask->len = 16;
+#else
     sigmask->len = 8;
+#endif
     memcpy(sigmask->sigset, sigset, sizeof(*sigset));
     r = kvm_vcpu_ioctl(cpu, KVM_SET_SIGNAL_MASK, sigmask);
     g_free(sigmask);
