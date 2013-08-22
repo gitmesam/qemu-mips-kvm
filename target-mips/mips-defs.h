@@ -5,7 +5,12 @@
 //#define USE_HOST_FLOAT_REGS
 
 /* Real pages are variable size... */
+#ifdef CONFIG_KVM
+/* For KVM/MIPS the minimum page size is 16K due to cache aliasing issues */
+#define TARGET_PAGE_BITS 14
+#else
 #define TARGET_PAGE_BITS 12
+#endif
 #define MIPS_TLB_MAX 128
 
 #if defined(TARGET_MIPS64)
