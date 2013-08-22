@@ -23,6 +23,7 @@
 #include "hw/hw.h"
 #include "hw/mips/cpudevs.h"
 #include "qemu/timer.h"
+#include "sysemu/kvm.h"
 
 #define TIMER_FREQ	100 * 1000 * 1000
 
@@ -141,7 +142,10 @@ static void mips_timer_cb (void *opaque)
 
 void cpu_mips_clock_init (CPUMIPSState *env)
 {
-    env->timer = qemu_new_timer_ns(vm_clock, &mips_timer_cb, env);
-    env->CP0_Compare = 0;
-    cpu_mips_store_count(env, 1);
+    /* If we're in KVM mode, don't start the periodic timer, that is handled in kernel */
+    if (!kvm_enabled()) {
+        env->timer = qemu_new_timer_ns(vm_clock, &mips_timer_cb, env);
+        env->CP0_Compare = 0;
+        cpu_mips_store_count(env, 1);
+    }
 }
