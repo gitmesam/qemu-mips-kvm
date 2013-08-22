@@ -31,6 +31,8 @@
 
 //#define DEBUG
 
+#define GT64XXX_VM_VERSION    1
+
 #ifdef DEBUG
 #define DPRINTF(fmt, ...) fprintf(stderr, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 #else
@@ -1093,6 +1095,316 @@ static void gt64120_reset(void *opaque)
     gt64120_pci_mapping(s);
 }
 
+static void gt64xxx_save(QEMUFile *f, void *opaque)
+{
+    GT64120State *s = opaque;
+
+    /* CPU Configuration */
+    qemu_put_be32s(f, &s->regs[GT_CPU]);
+    qemu_put_be32s(f, &s->regs[GT_MULTI]);
+
+    /* CPU Address decode */
+    qemu_put_be32s(f, &s->regs[GT_SCS10LD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS10HD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS32LD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS32HD]);
+    qemu_put_be32s(f, &s->regs[GT_CS20LD]);
+    qemu_put_be32s(f, &s->regs[GT_CS20HD]);
+    qemu_put_be32s(f, &s->regs[GT_CS3BOOTLD]);
+    qemu_put_be32s(f, &s->regs[GT_CS3BOOTHD]);
+
+    qemu_put_be32s(f, &s->regs[GT_PCI0IOLD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0IOHD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0M0LD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0M0HD]);
+    qemu_put_be32s(f, &s->regs[GT_ISD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0M1LD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0M1HD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1IOLD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1IOHD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1M0LD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1M0HD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1M1LD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1M1HD]);
+
+    qemu_put_be32s(f, &s->regs[GT_SCS10AR]);
+    qemu_put_be32s(f, &s->regs[GT_SCS32AR]);
+    qemu_put_be32s(f, &s->regs[GT_CS20R]);
+    qemu_put_be32s(f, &s->regs[GT_CS3BOOTR]);
+
+    qemu_put_be32s(f, &s->regs[GT_PCI0IOREMAP]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0M0REMAP]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0M1REMAP]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1IOREMAP]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1M0REMAP]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1M1REMAP]);
+
+    /* CPU Error Report */
+    qemu_put_be32s(f, &s->regs[GT_CPUERR_ADDRLO]);
+    qemu_put_be32s(f, &s->regs[GT_CPUERR_ADDRHI]);
+    qemu_put_be32s(f, &s->regs[GT_CPUERR_DATALO]);
+    qemu_put_be32s(f, &s->regs[GT_CPUERR_DATAHI]);
+    qemu_put_be32s(f, &s->regs[GT_CPUERR_PARITY]);
+
+    /* CPU Sync Barrier */
+    qemu_put_be32s(f, &s->regs[GT_PCI0SYNC]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1SYNC]);
+
+    /* SDRAM and Device Address Decode */
+    qemu_put_be32s(f, &s->regs[GT_SCS0LD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS0HD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS1LD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS1HD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS2LD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS2HD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS3LD]);
+    qemu_put_be32s(f, &s->regs[GT_SCS3HD]);
+    qemu_put_be32s(f, &s->regs[GT_CS0LD]);
+    qemu_put_be32s(f, &s->regs[GT_CS0HD]);
+    qemu_put_be32s(f, &s->regs[GT_CS1LD]);
+    qemu_put_be32s(f, &s->regs[GT_CS1HD]);
+    qemu_put_be32s(f, &s->regs[GT_CS2LD]);
+    qemu_put_be32s(f, &s->regs[GT_CS2HD]);
+    qemu_put_be32s(f, &s->regs[GT_CS3LD]);
+    qemu_put_be32s(f, &s->regs[GT_CS3HD]);
+    qemu_put_be32s(f, &s->regs[GT_BOOTLD]);
+    qemu_put_be32s(f, &s->regs[GT_BOOTHD]);
+    qemu_put_be32s(f, &s->regs[GT_ADERR]);
+
+    /* SDRAM Configuration */
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_CFG]);
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_OPMODE]);
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_BM]);
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_ADDRDECODE]);
+
+    /* SDRAM Parameters */
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_B0]);
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_B1]);
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_B2]);
+    qemu_put_be32s(f, &s->regs[GT_SDRAM_B3]);
+
+    /* ECC */
+    qemu_put_be32s(f, &s->regs[GT_ECC_ERRDATALO]);
+    qemu_put_be32s(f, &s->regs[GT_ECC_ERRDATAHI]);
+    qemu_put_be32s(f, &s->regs[GT_ECC_MEM]);
+    qemu_put_be32s(f, &s->regs[GT_ECC_CALC]);
+    qemu_put_be32s(f, &s->regs[GT_ECC_ERRADDR]);
+
+    /* Device Parameters */
+    qemu_put_be32s(f, &s->regs[GT_DEV_B0]);
+    qemu_put_be32s(f, &s->regs[GT_DEV_B1]);
+    qemu_put_be32s(f, &s->regs[GT_DEV_B2]);
+    qemu_put_be32s(f, &s->regs[GT_DEV_B3]);
+    qemu_put_be32s(f, &s->regs[GT_DEV_BOOT]);
+
+    /* DMA registers are all zeroed at reset */
+
+    /* Timer/Counter */
+    qemu_put_be32s(f, &s->regs[GT_TC0]);
+    qemu_put_be32s(f, &s->regs[GT_TC1]);
+    qemu_put_be32s(f, &s->regs[GT_TC2]);
+    qemu_put_be32s(f, &s->regs[GT_TC3]);
+    qemu_put_be32s(f, &s->regs[GT_TC_CONTROL]);
+
+    /* PCI Internal */
+    qemu_put_be32s(f, &s->regs[GT_PCI0_CMD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_CMD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_TOR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_BS_SCS10]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_BS_SCS32]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_BS_CS20]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_BS_CS3BT]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_IACK]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_IACK]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_BARE]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_PREFMBR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_SCS10_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_SCS32_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_CS20_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_CS3BT_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_SSCS10_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_SSCS32_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_SCS3BT_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_CMD]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_TOR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_BS_SCS10]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_BS_SCS32]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_BS_CS20]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_BS_CS3BT]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_BARE]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_PREFMBR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_SCS10_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_SCS32_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_CS20_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_CS3BT_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_SSCS10_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_SSCS32_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_SCS3BT_BAR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_CFGADDR]);
+    qemu_put_be32s(f, &s->regs[GT_PCI1_CFGDATA]);
+    qemu_put_be32s(f, &s->regs[GT_PCI0_CFGADDR]);
+
+    return;
+}
+
+static int gt64xxx_load(QEMUFile *f, void *opaque, int version_id)
+{
+    GT64120State *s = opaque;
+
+    if (version_id != GT64XXX_VM_VERSION)
+        return -EINVAL;
+
+    /* CPU Configuration */
+    qemu_get_be32s(f, &s->regs[GT_CPU]);
+    qemu_get_be32s(f, &s->regs[GT_MULTI]);
+
+    /* CPU Address decode */
+    qemu_get_be32s(f, &s->regs[GT_SCS10LD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS10HD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS32LD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS32HD]);
+    qemu_get_be32s(f, &s->regs[GT_CS20LD]);
+    qemu_get_be32s(f, &s->regs[GT_CS20HD]);
+    qemu_get_be32s(f, &s->regs[GT_CS3BOOTLD]);
+    qemu_get_be32s(f, &s->regs[GT_CS3BOOTHD]);
+
+    qemu_get_be32s(f, &s->regs[GT_PCI0IOLD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0IOHD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0M0LD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0M0HD]);
+    qemu_get_be32s(f, &s->regs[GT_ISD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0M1LD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0M1HD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1IOLD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1IOHD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1M0LD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1M0HD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1M1LD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1M1HD]);
+
+    qemu_get_be32s(f, &s->regs[GT_SCS10AR]);
+    qemu_get_be32s(f, &s->regs[GT_SCS32AR]);
+    qemu_get_be32s(f, &s->regs[GT_CS20R]);
+    qemu_get_be32s(f, &s->regs[GT_CS3BOOTR]);
+
+    qemu_get_be32s(f, &s->regs[GT_PCI0IOREMAP]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0M0REMAP]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0M1REMAP]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1IOREMAP]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1M0REMAP]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1M1REMAP]);
+
+    /* CPU Error Report */
+    qemu_get_be32s(f, &s->regs[GT_CPUERR_ADDRLO]);
+    qemu_get_be32s(f, &s->regs[GT_CPUERR_ADDRHI]);
+    qemu_get_be32s(f, &s->regs[GT_CPUERR_DATALO]);
+    qemu_get_be32s(f, &s->regs[GT_CPUERR_DATAHI]);
+    qemu_get_be32s(f, &s->regs[GT_CPUERR_PARITY]);
+
+    /* CPU Sync Barrier */
+    qemu_get_be32s(f, &s->regs[GT_PCI0SYNC]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1SYNC]);
+
+    /* SDRAM and Device Address Decode */
+    qemu_get_be32s(f, &s->regs[GT_SCS0LD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS0HD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS1LD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS1HD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS2LD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS2HD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS3LD]);
+    qemu_get_be32s(f, &s->regs[GT_SCS3HD]);
+    qemu_get_be32s(f, &s->regs[GT_CS0LD]);
+    qemu_get_be32s(f, &s->regs[GT_CS0HD]);
+    qemu_get_be32s(f, &s->regs[GT_CS1LD]);
+    qemu_get_be32s(f, &s->regs[GT_CS1HD]);
+    qemu_get_be32s(f, &s->regs[GT_CS2LD]);
+    qemu_get_be32s(f, &s->regs[GT_CS2HD]);
+    qemu_get_be32s(f, &s->regs[GT_CS3LD]);
+    qemu_get_be32s(f, &s->regs[GT_CS3HD]);
+    qemu_get_be32s(f, &s->regs[GT_BOOTLD]);
+    qemu_get_be32s(f, &s->regs[GT_BOOTHD]);
+    qemu_get_be32s(f, &s->regs[GT_ADERR]);
+
+    /* SDRAM Configuration */
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_CFG]);
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_OPMODE]);
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_BM]);
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_ADDRDECODE]);
+
+    /* SDRAM Parameters */
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_B0]);
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_B1]);
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_B2]);
+    qemu_get_be32s(f, &s->regs[GT_SDRAM_B3]);
+
+    /* ECC */
+    qemu_get_be32s(f, &s->regs[GT_ECC_ERRDATALO]);
+    qemu_get_be32s(f, &s->regs[GT_ECC_ERRDATAHI]);
+    qemu_get_be32s(f, &s->regs[GT_ECC_MEM]);
+    qemu_get_be32s(f, &s->regs[GT_ECC_CALC]);
+    qemu_get_be32s(f, &s->regs[GT_ECC_ERRADDR]);
+
+    /* Device Parameters */
+    qemu_get_be32s(f, &s->regs[GT_DEV_B0]);
+    qemu_get_be32s(f, &s->regs[GT_DEV_B1]);
+    qemu_get_be32s(f, &s->regs[GT_DEV_B2]);
+    qemu_get_be32s(f, &s->regs[GT_DEV_B3]);
+    qemu_get_be32s(f, &s->regs[GT_DEV_BOOT]);
+
+    /* DMA registers are all zeroed at reset */
+
+    /* Timer/Counter */
+    qemu_get_be32s(f, &s->regs[GT_TC0]);
+    qemu_get_be32s(f, &s->regs[GT_TC1]);
+    qemu_get_be32s(f, &s->regs[GT_TC2]);
+    qemu_get_be32s(f, &s->regs[GT_TC3]);
+    qemu_get_be32s(f, &s->regs[GT_TC_CONTROL]);
+
+    /* PCI Internal */
+    qemu_get_be32s(f, &s->regs[GT_PCI0_CMD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_CMD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_TOR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_BS_SCS10]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_BS_SCS32]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_BS_CS20]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_BS_CS3BT]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_IACK]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_IACK]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_BARE]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_PREFMBR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_SCS10_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_SCS32_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_CS20_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_CS3BT_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_SSCS10_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_SSCS32_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_SCS3BT_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_CMD]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_TOR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_BS_SCS10]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_BS_SCS32]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_BS_CS20]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_BS_CS3BT]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_BARE]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_PREFMBR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_SCS10_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_SCS32_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_CS20_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_CS3BT_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_SSCS10_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_SSCS32_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_SCS3BT_BAR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_CFGADDR]);
+    qemu_get_be32s(f, &s->regs[GT_PCI1_CFGDATA]);
+    qemu_get_be32s(f, &s->regs[GT_PCI0_CFGADDR]);
+
+    gt64120_isd_mapping(s);
+    gt64120_pci_mapping(s);
+
+    return 0;
+}
+
 PCIBus *gt64120_register(qemu_irq *pic)
 {
     GT64120State *d;
@@ -1112,6 +1424,10 @@ PCIBus *gt64120_register(qemu_irq *pic)
     memory_region_init_io(&d->ISD_mem, OBJECT(dev), &isd_mem_ops, d, "isd-mem", 0x1000);
 
     pci_create_simple(phb->bus, PCI_DEVFN(0, 0), "gt64120_pci");
+
+    register_savevm(dev, "gt64xxx", -1, GT64XXX_VM_VERSION,
+                    gt64xxx_save, gt64xxx_load, d);
+ 
     return phb->bus;
 }
 
