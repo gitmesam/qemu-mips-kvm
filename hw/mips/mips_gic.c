@@ -3,8 +3,6 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * KVM/MIPS: MIPS specific KVM APIs
- *
  * Copyright (C) 2012  MIPS Technologies, Inc.  All rights reserved.
  * Authors: Sanjay Lal <sanjayl@kymasys.com>
 */
@@ -20,7 +18,7 @@
 #endif
 
 #include "hw/mips/mips_gic.h"
-#include "hw/mips_gcmpregs.h"
+#include "hw/mips/mips_gcmpregs.h"
 
 //#define DEBUG
 
@@ -364,9 +362,8 @@ static const MemoryRegionOps gcr_ops = {
 };
 
 qemu_irq *
-gic_init(uint32_t ncpus, CPUMIPSState *env, MemoryRegion * address_space)
+gic_init(uint32_t ncpus, CPUState *cs, MemoryRegion * address_space)
 {
-    CPUMIPSState *next_env;
     gic_t *gic;
     uint32_t x;
 
@@ -378,11 +375,10 @@ gic_init(uint32_t ncpus, CPUMIPSState *env, MemoryRegion * address_space)
     gic = (gic_t *) g_malloc0(sizeof(gic_t));
 
     /* Register the CPU env for all cpus with the GIC */
-    next_env = env;
     for (x = 0; x < ncpus; x++) {
-        if (next_env != NULL) {
-            gic->env[x] = next_env;
-            next_env = next_env->next_cpu;
+        if (cs != NULL) {
+            gic->env[x] = cs->env_ptr;
+            cs = cs->next_cpu;
         } else {
             fprintf(stderr, "Unable to initialize GIC - CPUMIPSState for CPU #%d not valid!", x);
             return NULL;
@@ -390,9 +386,9 @@ gic_init(uint32_t ncpus, CPUMIPSState *env, MemoryRegion * address_space)
     }
 
     /* Register GCR & GIC regions */
-    memory_region_init_io(&gic->gcr_mem, &gcr_ops, gic, "GCR",
+    memory_region_init_io(&gic->gcr_mem, NULL, &gcr_ops, gic, "GCR",
                           GCMP_ADDRSPACE_SZ);
-    memory_region_init_io(&gic->gic_mem, &gic_ops, gic, "GIC",
+    memory_region_init_io(&gic->gic_mem, NULL, &gic_ops, gic, "GIC",
                           GIC_ADDRSPACE_SZ);
 
     memory_region_add_subregion(address_space, GCMP_BASE_ADDR, &gic->gcr_mem);

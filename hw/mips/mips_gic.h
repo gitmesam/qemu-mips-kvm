@@ -373,6 +373,6 @@ struct gic_intr_map {
 #define GIC_FLAG_TRANSPARENT   0x02
 };
 
-qemu_irq *gic_init (uint32_t ncpus, CPUMIPSState *env, MemoryRegion *address_space);
+qemu_irq *gic_init(uint32_t ncpus, CPUState *cs, MemoryRegion * address_space);
 
 #endif /* _ASM_GICREGS_H */
