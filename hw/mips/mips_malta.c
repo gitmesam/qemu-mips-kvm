@@ -52,6 +52,14 @@
 #include "qemu/error-report.h"
 #include "hw/empty_slot.h"
 
+#include "qemu/bitmap.h"
+#include "hw/mips/mips_gic.h"
+#include "sysemu/kvm.h"
+#include "linux/kvm.h"
+#include "kvm_mips.h"
+
+#include "hw/mips_cps_bootcode.h"
+
 //#define DEBUG_BOARD_INIT
 
 #define ENVP_ADDR		0x80002000l
@@ -609,27 +617,36 @@ static void write_bootloader (CPUMIPSState *env, uint8_t *base,
 
     /* Small bootloader */
     p = (uint32_t *)base;
-    stl_raw(p++, 0x0bf00160);                                      /* j 0x1fc00580 */
-    stl_raw(p++, 0x00000000);                                      /* nop */
 
-    /* YAMON service vector */
-    stl_raw(base + 0x500, 0xbfc00580);      /* start: */
-    stl_raw(base + 0x504, 0xbfc0083c);      /* print_count: */
-    stl_raw(base + 0x520, 0xbfc00580);      /* start: */
-    stl_raw(base + 0x52c, 0xbfc00800);      /* flush_cache: */
-    stl_raw(base + 0x534, 0xbfc00808);      /* print: */
-    stl_raw(base + 0x538, 0xbfc00800);      /* reg_cpu_isr: */
-    stl_raw(base + 0x53c, 0xbfc00800);      /* unred_cpu_isr: */
-    stl_raw(base + 0x540, 0xbfc00800);      /* reg_ic_isr: */
-    stl_raw(base + 0x544, 0xbfc00800);      /* unred_ic_isr: */
-    stl_raw(base + 0x548, 0xbfc00800);      /* reg_esr: */
-    stl_raw(base + 0x54c, 0xbfc00800);      /* unreg_esr: */
-    stl_raw(base + 0x550, 0xbfc00800);      /* getchar: */
-    stl_raw(base + 0x554, 0xbfc00800);      /* syscon_read: */
+    if (kvm_enabled()) {
+        memcpy((void *)base, (void *)__boot_cps_data, sizeof(__boot_cps_data));
 
+        /* Second part of the bootloader */
+        p = (uint32_t *) (base + 0x100);
+    } else {
+        stl_raw(p++, 0x0bf00160);                                      /* j 0x1fc00580 */
+        stl_raw(p++, 0x00000000);                                      /* nop */
+
+        /* YAMON service vector */
+        stl_raw(base + 0x500, 0xbfc00580);      /* start: */
+        stl_raw(base + 0x504, 0xbfc0083c);      /* print_count: */
+        stl_raw(base + 0x520, 0xbfc00580);      /* start: */
+        stl_raw(base + 0x52c, 0xbfc00800);      /* flush_cache: */
+        stl_raw(base + 0x534, 0xbfc00808);      /* print: */
+        stl_raw(base + 0x538, 0xbfc00800);      /* reg_cpu_isr: */
+        stl_raw(base + 0x53c, 0xbfc00800);      /* unred_cpu_isr: */
+        stl_raw(base + 0x540, 0xbfc00800);      /* reg_ic_isr: */
+        stl_raw(base + 0x544, 0xbfc00800);      /* unred_ic_isr: */
+        stl_raw(base + 0x548, 0xbfc00800);      /* reg_esr: */
+        stl_raw(base + 0x54c, 0xbfc00800);      /* unreg_esr: */
+        stl_raw(base + 0x550, 0xbfc00800);      /* getchar: */
+        stl_raw(base + 0x554, 0xbfc00800);      /* syscon_read: */
+
+        /* Second part of the bootloader */
+        p = (uint32_t *) (base + 0x580);
+    }
 
     /* Second part of the bootloader */
-    p = (uint32_t *) (base + 0x580);
     stl_raw(p++, 0x24040002);                                      /* addiu a0, zero, 2 */
     stl_raw(p++, 0x3c1d0000 | (((ENVP_ADDR - 64) >> 16) & 0xffff)); /* lui sp, high(ENVP_ADDR) */
     stl_raw(p++, 0x37bd0000 | ((ENVP_ADDR - 64) & 0xffff));        /* ori sp, sp, low(ENVP_ADDR) */
@@ -698,48 +715,49 @@ static void write_bootloader (CPUMIPSState *env, uint8_t *base,
     stl_raw(p++, 0x00000000);                                      /* nop */
 
     /* YAMON subroutines */
-    p = (uint32_t *) (base + 0x800);
-    stl_raw(p++, 0x03e00008);                                     /* jr ra */
-    stl_raw(p++, 0x24020000);                                     /* li v0,0 */
-   /* 808 YAMON print */
-    stl_raw(p++, 0x03e06821);                                     /* move t5,ra */
-    stl_raw(p++, 0x00805821);                                     /* move t3,a0 */
-    stl_raw(p++, 0x00a05021);                                     /* move t2,a1 */
-    stl_raw(p++, 0x91440000);                                     /* lbu a0,0(t2) */
-    stl_raw(p++, 0x254a0001);                                     /* addiu t2,t2,1 */
-    stl_raw(p++, 0x10800005);                                     /* beqz a0,834 */
-    stl_raw(p++, 0x00000000);                                     /* nop */
-    stl_raw(p++, 0x0ff0021c);                                     /* jal 870 */
-    stl_raw(p++, 0x00000000);                                     /* nop */
-    stl_raw(p++, 0x08000205);                                     /* j 814 */
-    stl_raw(p++, 0x00000000);                                     /* nop */
-    stl_raw(p++, 0x01a00008);                                     /* jr t5 */
-    stl_raw(p++, 0x01602021);                                     /* move a0,t3 */
-    /* 0x83c YAMON print_count */
-    stl_raw(p++, 0x03e06821);                                     /* move t5,ra */
-    stl_raw(p++, 0x00805821);                                     /* move t3,a0 */
-    stl_raw(p++, 0x00a05021);                                     /* move t2,a1 */
-    stl_raw(p++, 0x00c06021);                                     /* move t4,a2 */
-    stl_raw(p++, 0x91440000);                                     /* lbu a0,0(t2) */
-    stl_raw(p++, 0x0ff0021c);                                     /* jal 870 */
-    stl_raw(p++, 0x00000000);                                     /* nop */
-    stl_raw(p++, 0x254a0001);                                     /* addiu t2,t2,1 */
-    stl_raw(p++, 0x258cffff);                                     /* addiu t4,t4,-1 */
-    stl_raw(p++, 0x1580fffa);                                     /* bnez t4,84c */
-    stl_raw(p++, 0x00000000);                                     /* nop */
-    stl_raw(p++, 0x01a00008);                                     /* jr t5 */
-    stl_raw(p++, 0x01602021);                                     /* move a0,t3 */
-    /* 0x870 */
-    stl_raw(p++, 0x3c08b800);                                     /* lui t0,0xb400 */
-    stl_raw(p++, 0x350803f8);                                     /* ori t0,t0,0x3f8 */
-    stl_raw(p++, 0x91090005);                                     /* lbu t1,5(t0) */
-    stl_raw(p++, 0x00000000);                                     /* nop */
-    stl_raw(p++, 0x31290040);                                     /* andi t1,t1,0x40 */
-    stl_raw(p++, 0x1120fffc);                                     /* beqz t1,878 <outch+0x8> */
-    stl_raw(p++, 0x00000000);                                     /* nop */
-    stl_raw(p++, 0x03e00008);                                     /* jr ra */
-    stl_raw(p++, 0xa1040000);                                     /* sb a0,0(t0) */
-
+    if (!kvm_enabled()) {
+        p = (uint32_t *) (base + 0x800);
+        stl_raw(p++, 0x03e00008);                                     /* jr ra */
+        stl_raw(p++, 0x24020000);                                     /* li v0,0 */
+        /* 808 YAMON print */
+        stl_raw(p++, 0x03e06821);                                     /* move t5,ra */
+        stl_raw(p++, 0x00805821);                                     /* move t3,a0 */
+        stl_raw(p++, 0x00a05021);                                     /* move t2,a1 */
+        stl_raw(p++, 0x91440000);                                     /* lbu a0,0(t2) */
+        stl_raw(p++, 0x254a0001);                                     /* addiu t2,t2,1 */
+        stl_raw(p++, 0x10800005);                                     /* beqz a0,834 */
+        stl_raw(p++, 0x00000000);                                     /* nop */
+        stl_raw(p++, 0x0ff0021c);                                     /* jal 870 */
+        stl_raw(p++, 0x00000000);                                     /* nop */
+        stl_raw(p++, 0x08000205);                                     /* j 814 */
+        stl_raw(p++, 0x00000000);                                     /* nop */
+        stl_raw(p++, 0x01a00008);                                     /* jr t5 */
+        stl_raw(p++, 0x01602021);                                     /* move a0,t3 */
+        /* 0x83c YAMON print_count */
+        stl_raw(p++, 0x03e06821);                                     /* move t5,ra */
+        stl_raw(p++, 0x00805821);                                     /* move t3,a0 */
+        stl_raw(p++, 0x00a05021);                                     /* move t2,a1 */
+        stl_raw(p++, 0x00c06021);                                     /* move t4,a2 */
+        stl_raw(p++, 0x91440000);                                     /* lbu a0,0(t2) */
+        stl_raw(p++, 0x0ff0021c);                                     /* jal 870 */
+        stl_raw(p++, 0x00000000);                                     /* nop */
+        stl_raw(p++, 0x254a0001);                                     /* addiu t2,t2,1 */
+        stl_raw(p++, 0x258cffff);                                     /* addiu t4,t4,-1 */
+        stl_raw(p++, 0x1580fffa);                                     /* bnez t4,84c */
+        stl_raw(p++, 0x00000000);                                     /* nop */
+        stl_raw(p++, 0x01a00008);                                     /* jr t5 */
+        stl_raw(p++, 0x01602021);                                     /* move a0,t3 */
+        /* 0x870 */
+        stl_raw(p++, 0x3c08b800);                                     /* lui t0,0xb400 */
+        stl_raw(p++, 0x350803f8);                                     /* ori t0,t0,0x3f8 */
+        stl_raw(p++, 0x91090005);                                     /* lbu t1,5(t0) */
+        stl_raw(p++, 0x00000000);                                     /* nop */
+        stl_raw(p++, 0x31290040);                                     /* andi t1,t1,0x40 */
+        stl_raw(p++, 0x1120fffc);                                     /* beqz t1,878 <outch+0x8> */
+        stl_raw(p++, 0x00000000);                                     /* nop */
+        stl_raw(p++, 0x03e00008);                                     /* jr ra */
+        stl_raw(p++, 0xa1040000);                                     /* sb a0,0(t0) */
+    }
 }
 
 static void GCC_FMT_ATTR(3, 4) prom_set(uint32_t* prom_buf, int index,
@@ -765,7 +783,7 @@ static void GCC_FMT_ATTR(3, 4) prom_set(uint32_t* prom_buf, int index,
 }
 
 /* Kernel */
-static int64_t load_kernel (void)
+static int64_t load_kernel (CPUMIPSState *env)
 {
     int64_t kernel_entry, kernel_high;
     long initrd_size;
@@ -774,6 +792,8 @@ static int64_t load_kernel (void)
     uint32_t *prom_buf;
     long prom_size;
     int prom_index = 0;
+    uint64_t (*xlate_to_phys) (void *opaque, uint64_t addr);
+    uint64_t (*xlate_to_kseg0) (void *opaque, uint64_t addr);
 
 #ifdef TARGET_WORDS_BIGENDIAN
     big_endian = 1;
@@ -781,7 +801,19 @@ static int64_t load_kernel (void)
     big_endian = 0;
 #endif
 
-    if (load_elf(loaderparams.kernel_filename, cpu_mips_kseg0_to_phys, NULL,
+    if (kvm_enabled()) {
+        xlate_to_phys = cpu_mips_kvm_um_kseg0_to_phys;
+        xlate_to_kseg0 = cpu_mips_kvm_um_phys_to_kseg0;
+        if (kvm_mips_vz_capability(env)) {
+            xlate_to_phys = cpu_mips_kvm_vz_kseg0_to_phys;
+            xlate_to_kseg0 = cpu_mips_kvm_vz_phys_to_kseg0;
+        }
+    } else {
+        xlate_to_phys = cpu_mips_kseg0_to_phys;
+        xlate_to_kseg0 = cpu_mips_phys_to_kseg0;
+    }
+
+    if (load_elf(loaderparams.kernel_filename, xlate_to_phys, NULL,
                  (uint64_t *)&kernel_entry, NULL, (uint64_t *)&kernel_high,
                  big_endian, ELF_MACHINE, 1) < 0) {
         fprintf(stderr, "qemu: could not load kernel '%s'\n",
@@ -820,20 +852,20 @@ static int64_t load_kernel (void)
     prom_set(prom_buf, prom_index++, "%s", loaderparams.kernel_filename);
     if (initrd_size > 0) {
         prom_set(prom_buf, prom_index++, "rd_start=0x%" PRIx64 " rd_size=%li %s",
-                 cpu_mips_phys_to_kseg0(NULL, initrd_offset), initrd_size,
+                 xlate_to_kseg0(NULL, initrd_offset), initrd_size,
                  loaderparams.kernel_cmdline);
     } else {
         prom_set(prom_buf, prom_index++, "%s", loaderparams.kernel_cmdline);
     }
 
     prom_set(prom_buf, prom_index++, "memsize");
-    prom_set(prom_buf, prom_index++, "%i", loaderparams.ram_size);
+    prom_set(prom_buf, prom_index++, "%i", (loaderparams.ram_size - 0x100000));
     prom_set(prom_buf, prom_index++, "modetty0");
     prom_set(prom_buf, prom_index++, "38400n8r");
     prom_set(prom_buf, prom_index++, NULL);
 
     rom_add_blob_fixed("prom", prom_buf, prom_size,
-                       cpu_mips_kseg0_to_phys(NULL, ENVP_ADDR));
+                       xlate_to_phys(NULL, ENVP_ADDR));
 
     return kernel_entry;
 }
@@ -862,6 +894,26 @@ static void main_cpu_reset(void *opaque)
     }
 
     malta_mips_config(cpu);
+
+    if (kvm_enabled()) {
+
+        /* Start running @ the point where the bootrom configures the north bridge BARs */
+        env->active_tc.PC = 0x40000000 + ((loaderparams.ram_size - 0x100000));
+
+        if (kvm_mips_vz_capability(env)) {
+            env->active_tc.PC = 0x80000000 + ((loaderparams.ram_size - 0x100000));
+        }
+
+        /* a0 - number of kernel arguments
+         * a1 - 32-bit address of the kernel arguments table
+         * a2 - 32-bit address of the environment variables table
+         * a3 - RAM size in bytes
+         */
+        env->active_tc.gpr[4] = 0x2;
+        env->active_tc.gpr[5] = 0x80002000;
+        env->active_tc.gpr[6] = 0x80002008;
+        env->active_tc.gpr[7] = loaderparams.ram_size - 0x100000;
+    }
 }
 
 static void cpu_request_exit(void *opaque, int irq, int level)
@@ -930,7 +982,11 @@ void mips_malta_init(QEMUMachineInitArgs *args)
 #ifdef TARGET_MIPS64
         cpu_model = "20Kc";
 #else
+#ifdef CONFIG_KVM_MIPS_VZ
+        cpu_model = "24Kc";
+#else
         cpu_model = "24Kf";
+#endif
 #endif
     }
 
@@ -996,8 +1052,13 @@ void mips_malta_init(QEMUMachineInitArgs *args)
         loaderparams.kernel_filename = kernel_filename;
         loaderparams.kernel_cmdline = kernel_cmdline;
         loaderparams.initrd_filename = initrd_filename;
-        kernel_entry = load_kernel();
+        kernel_entry = load_kernel(env);
         write_bootloader(env, memory_region_get_ram_ptr(bios), kernel_entry);
+        if (kvm_enabled()) {
+            /* Write the bootloader code at the end of RAM, 1MB reserved */
+            printf("Writing bootloader to final 1MB of RAM\n");
+            write_bootloader(env, memory_region_get_ram_ptr(ram) + loaderparams.ram_size - 0x100000, kernel_entry);
+        }
     } else {
         /* Load firmware from flash. */
         if (!dinfo) {
@@ -1058,6 +1119,11 @@ void mips_malta_init(QEMUMachineInitArgs *args)
     /* Init internal devices */
     cpu_mips_irq_init_cpu(env);
     cpu_mips_clock_init(env);
+
+    /* GCR/GIC */
+    if (kvm_enabled() && smp_cpus > 1) {
+        gic_init(smp_cpus, first_cpu, system_memory);
+    }
 
     /*
      * We have a circular dependency problem: pci_bus depends on isa_irq,
