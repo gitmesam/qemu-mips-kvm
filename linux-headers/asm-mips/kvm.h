@@ -72,6 +72,27 @@ struct kvm_fpu {
  * id values for these are below.
  */
 
+#define KVM_MIPS_MSR_CP0 0
+struct kvm_msr_entry {
+	__u32 index;
+	__u32 reserved;
+	__u64 data;
+};
+
+/* for KVM_GET_MSRS and KVM_SET_MSRS */
+struct kvm_msrs {
+	__u32 nmsrs; /* number of msrs in entries */
+	__u32 pad;
+
+	struct kvm_msr_entry entries[0];
+};
+
+/* for KVM_GET_MSR_INDEX_LIST */
+struct kvm_msr_list {
+	__u32 nmsrs; /* number of msrs in entries */
+	__u32 indices[0];
+};
+
 #define KVM_REG_MIPS_R0 0
 #define KVM_REG_MIPS_R1 1
 #define KVM_REG_MIPS_R2 2
